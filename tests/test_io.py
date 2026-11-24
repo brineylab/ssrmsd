@@ -31,9 +31,7 @@ def test_parse_cif_pdb_and_gzipped_variants(tmp_path: Path) -> None:
         write_cif(tmp_path / "a.cif.gz", chains, gzipped=True, add_water=True, add_altloc_b=True),
         write_pdb(tmp_path / "a.pdb.gz", chains, gzipped=True, add_water=True, add_altloc_b=True),
     ]
-    parsed = [
-        load_ensemble_structures([StructureInput(p)], ScoringOptions())[0] for p in paths
-    ]
+    parsed = [load_ensemble_structures([StructureInput(p)], ScoringOptions())[0] for p in paths]
     ref = parsed[0]
     assert [c.chain_id for c in ref.chains] == ["A", "B", "C"]
     assert ref.chains[0].ca_coords.dtype == np.float64

@@ -216,7 +216,8 @@ def align_ensemble(
             if ident >= options.min_chain_id:
                 raise SsrmsdError(
                     f"Ambiguous/homomeric chains detected in reference ('{c1.chain_id}' and "
-                    f"'{c2.chain_id}', identity={ident:.2f}); homomer symmetry matching is not enabled"
+                    f"'{c2.chain_id}', identity={ident:.2f}); "
+                    "homomer symmetry matching is not enabled"
                 )
 
     # Match each structure's chains to required reference chains and record residue alignments.

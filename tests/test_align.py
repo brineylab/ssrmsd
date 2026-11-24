@@ -175,7 +175,7 @@ def test_homomer_and_ambiguous_chain_guard() -> None:
     with pytest.raises(SsrmsdError, match="ambiguous|homomer"):
         align_ensemble([s_homo_0, s_homo_1], ScoringOptions())
 
-    # Non-reference has two copies matching reference chain A above threshold -> ambiguous guard fires
+    # Non-reference has two copies matching ref chain A above threshold -> ambiguous guard fires
     s_ref = _make_struct("ref", [("A", ag_seq, ag_xyz), ("B", hc_seq, hc_xyz)])
     s_dup = _make_struct(
         "dup",

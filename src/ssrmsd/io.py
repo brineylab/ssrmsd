@@ -14,7 +14,14 @@ from typing import Literal
 import gemmi
 import numpy as np
 
-from ssrmsd.types import ChainData, EnsembleSpec, ScoringOptions, SsrmsdError, StructureData, StructureInput
+from ssrmsd.types import (
+    ChainData,
+    EnsembleSpec,
+    ScoringOptions,
+    SsrmsdError,
+    StructureData,
+    StructureInput,
+)
 
 SUPPORTED_STRUCTURE_SUFFIXES: tuple[str, ...] = (
     ".cif.gz",
@@ -169,11 +176,7 @@ def _filter_member_paths(
     options: ScoringOptions,
 ) -> list[str]:
     cleaned = [p.lstrip("./") for p in relpaths]
-    candidates = [
-        p
-        for p in cleaned
-        if not p.startswith("__MACOSX/") and is_structure_filename(p)
-    ]
+    candidates = [p for p in cleaned if not p.startswith("__MACOSX/") and is_structure_filename(p)]
     if options.glob_pattern is not None:
         matched = [
             p
@@ -356,7 +359,11 @@ def load_manifest(path: Path, *, delimiter: str | None = None) -> list[EnsembleS
     """Load batch `EnsembleSpec` definitions from a CSV or TSV manifest file."""
     if not path.is_file():
         raise SsrmsdError(f"Manifest file does not exist: {path}")
-    sep = delimiter if delimiter is not None else ("\t" if path.suffix.lower() in (".tsv", ".tab") else ",")
+    sep = (
+        delimiter
+        if delimiter is not None
+        else ("\t" if path.suffix.lower() in (".tsv", ".tab") else ",")
+    )
     grouped: OrderedDict[str, list[StructureInput]] = OrderedDict()
     try:
         with path.open("r", encoding="utf-8", newline="") as handle:

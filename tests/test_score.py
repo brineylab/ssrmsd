@@ -17,7 +17,7 @@ from conftest import (
 
 import ssrmsd
 from ssrmsd.score import score_batch, score_ensemble
-from ssrmsd.types import EnsembleSpec, ScoringOptions, SsrmsdError, StructureInput
+from ssrmsd.types import EnsembleSpec, SsrmsdError, StructureInput
 
 
 def test_score_ensemble_mixed_af3_tar_gz_and_esmfold_pdb(tmp_path: Path) -> None:

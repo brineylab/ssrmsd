@@ -15,7 +15,7 @@ def kabsch_rmsd(
     p_score: np.ndarray | None = None,
     q_score: np.ndarray | None = None,
 ) -> float:
-    """Compute float64 Kabsch RMSD aligning `p_align` onto `q_align` and scoring `p_score` vs `q_score`."""
+    """Compute float64 Kabsch RMSD aligning `p_align` onto `q_align`."""
     p_a = np.asarray(p_align, dtype=np.float64)
     q_a = np.asarray(q_align, dtype=np.float64)
     if p_a.shape != q_a.shape or p_a.ndim != 2 or p_a.shape[1] != 3 or len(p_a) == 0:

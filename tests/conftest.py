@@ -231,7 +231,11 @@ def make_af3_job_dir(
     """Create a synthetic local AF3 job directory with sample subdirs + top-level duplicate."""
     job_dir = root / job_name
     job_dir.mkdir(parents=True, exist_ok=True)
-    shifts = list(ab_shifts) if ab_shifts is not None else [(float(i), 0.0, 0.0) for i in range(n_samples)]
+    shifts = (
+        list(ab_shifts)
+        if ab_shifts is not None
+        else [(float(i), 0.0, 0.0) for i in range(n_samples)]
+    )
     first_chains: list[tuple[str, str, np.ndarray]] | None = None
     for idx in range(n_samples):
         chains = make_complex_chains(ab_shift=shifts[idx], noise_seed=100 + idx, noise_scale=0.1)

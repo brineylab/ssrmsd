@@ -62,9 +62,17 @@ def test_kabsch_separate_align_and_score_sets() -> None:
 
 
 def test_legacy_parity_with_af3_worker_formula() -> None:
-    shifts = [(0.0, 0.0, 0.0), (1.2, -0.5, 0.3), (-0.8, 2.1, 0.0), (3.5, 1.0, -1.5), (0.4, 0.4, 2.2)]
+    shifts = [
+        (0.0, 0.0, 0.0),
+        (1.2, -0.5, 0.3),
+        (-0.8, 2.1, 0.0),
+        (3.5, 1.0, -1.5),
+        (0.4, 0.4, 2.2),
+    ]
     coords_list = [
-        np.vstack([xyz for _, _, xyz in make_complex_chains(ab_shift=s, noise_seed=i, noise_scale=0.15)])
+        np.vstack(
+            [xyz for _, _, xyz in make_complex_chains(ab_shift=s, noise_seed=i, noise_scale=0.15)]
+        )
         for i, s in enumerate(shifts)
     ]
 
@@ -147,7 +155,7 @@ def test_multi_source_within_and_cross_metrics() -> None:
     assert res.cross_source_mean_rmsd > 5.5
     assert len(res.pairwise) == 10
 
-    # 1 af3 + 1 esmfold: 0 within-source pairs -> within_source_mean_rmsd is None (no ZeroDivisionError/NaN)
+    # 1 af3 + 1 esmfold: 0 within-source pairs -> within_source_mean_rmsd is None
     aligned_2 = AlignedEnsemble(
         names=("a0", "e0"),
         sources=("af3", "esmfold"),
@@ -168,7 +176,9 @@ def test_multi_source_within_and_cross_metrics() -> None:
         score_coords=(af3_coords[0], esm_coords[0]),
         chain_mapping=({"A": "A", "B": "B"},) * 2,
     )
-    res_unlabeled = aggregate_metrics("u", aligned_unlabeled, compute_pairwise_matrix(aligned_unlabeled))
+    res_unlabeled = aggregate_metrics(
+        "u", aligned_unlabeled, compute_pairwise_matrix(aligned_unlabeled)
+    )
     assert res_unlabeled.sources == ""
     assert res_unlabeled.within_source_mean_rmsd is None
     assert res_unlabeled.cross_source_mean_rmsd is None
