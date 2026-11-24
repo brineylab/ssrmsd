@@ -8,7 +8,7 @@ import tarfile
 import zipfile
 from collections import OrderedDict
 from collections.abc import Sequence
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Literal
 
 import gemmi
@@ -94,16 +94,31 @@ def _extract_chains(model: gemmi.Model) -> tuple[ChainData, ...]:
         seq_chars: list[str] = []
         coords: list[tuple[float, float, float]] = []
         for res in chain:
-            if res.entity_type in (gemmi.EntityType.Water, gemmi.EntityType.NonPolymer):
-                continue
             tab = gemmi.find_tabulated_residue(res.name)
             if tab.is_water():
                 continue
-            ca_atom: gemmi.Atom | None = None
-            for atom in res.first_conformer():
-                if atom.name == "CA":
-                    ca_atom = atom
-                    break
+            if not tab.is_amino_acid() and (
+                tab.kind != gemmi.ResidueKind.UNKNOWN
+                or res.entity_type
+                in (
+                    gemmi.EntityType.Water,
+                    gemmi.EntityType.NonPolymer,
+                    gemmi.EntityType.Branched,
+                )
+            ):
+                continue
+            ca_atoms = [atom for atom in res if atom.name == "CA"]
+            if not ca_atoms:
+                continue
+            ca_atom = next(
+                (atom for atom in ca_atoms if atom.altloc in ("\x00", "", " ", "A")),
+                None,
+            )
+            if ca_atom is None:
+                for atom in res.first_conformer():
+                    if atom.name == "CA":
+                        ca_atom = atom
+                        break
             if ca_atom is None:
                 continue
             code = tab.one_letter_code.upper()
@@ -171,12 +186,26 @@ def read_structures_from_bytes(
     return results
 
 
+def _strip_dot_slash(path_str: str) -> str:
+    while path_str.startswith("./"):
+        path_str = path_str[2:]
+    return path_str
+
+
+def _is_hidden_relpath(path_str: str) -> bool:
+    return any(part.startswith(".") for part in PurePosixPath(path_str).parts)
+
+
 def _filter_member_paths(
     relpaths: Sequence[str],
     options: ScoringOptions,
 ) -> list[str]:
-    cleaned = [p.lstrip("./") for p in relpaths]
-    candidates = [p for p in cleaned if not p.startswith("__MACOSX/") and is_structure_filename(p)]
+    cleaned = [_strip_dot_slash(p) for p in relpaths]
+    candidates = [
+        p
+        for p in cleaned
+        if not p.startswith("__MACOSX/") and not _is_hidden_relpath(p) and is_structure_filename(p)
+    ]
     if options.glob_pattern is not None:
         matched = [
             p
@@ -198,7 +227,7 @@ def _load_from_tar(path: Path, source: str | None, options: ScoringOptions) -> l
     try:
         with tarfile.open(path, "r:*") as tf:
             members = [m for m in tf.getmembers() if m.isfile()]
-            by_name = {m.name.lstrip("./"): m for m in members}
+            by_name = {_strip_dot_slash(m.name): m for m in members}
             selected = _filter_member_paths(list(by_name.keys()), options)
             out: list[StructureData] = []
             for rel in selected:
@@ -225,7 +254,7 @@ def _load_from_zip(path: Path, source: str | None, options: ScoringOptions) -> l
     try:
         with zipfile.ZipFile(path, "r") as zf:
             infos = [info for info in zf.infolist() if not info.is_dir()]
-            by_name = {info.filename.lstrip("./"): info for info in infos}
+            by_name = {_strip_dot_slash(info.filename): info for info in infos}
             selected = _filter_member_paths(list(by_name.keys()), options)
             out: list[StructureData] = []
             for rel in selected:

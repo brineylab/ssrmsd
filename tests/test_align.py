@@ -183,3 +183,29 @@ def test_homomer_and_ambiguous_chain_guard() -> None:
     )
     with pytest.raises(SsrmsdError, match="ambiguous|homomer"):
         align_ensemble([s_ref, s_dup], ScoringOptions(align_chains=("A",), score_chains=("B",)))
+
+
+def test_short_peptide_with_long_fab_not_flagged_as_homomer() -> None:
+    # Realistic 220-aa human Fab HC + 8-aa FLAG peptide & 10-aa Myc peptide
+    fab_hc = (
+        "EVQLVESGGGLVQPGGSLRLSCAASGFTFSSYAMSWVRQAPGKGLEWVSAISGSGGSTYYADSVKGRFTISRDNSKNTLYLQMNSL"
+        "RAEDTAVYYCAKDYKGGDDDDKWGQGTLVTVSSASTKGPSVFPLAPSSKSTSGGTAALGCLVKDYFPEPVTVSWNSGALTSGVHTF"
+        "PAVLQSSGLYSLSSVVTVPSSSLGTQTYICNVNHKPSNTKVDKKVEPK"
+    )
+    flag_pep = "DYKDDDDK"
+    myc_pep = "EQKLISEEDL"
+
+    hc_xyz = make_helix_coords(len(fab_hc), offset=(0.0, 0.0, 0.0))
+    flag_xyz = make_helix_coords(len(flag_pep), offset=(20.0, 0.0, 0.0))
+    myc_xyz = make_helix_coords(len(myc_pep), offset=(20.0, 10.0, 0.0))
+
+    s0 = _make_struct(
+        "m0", [("H", fab_hc, hc_xyz), ("P", flag_pep, flag_xyz), ("M", myc_pep, myc_xyz)]
+    )
+    s1 = _make_struct(
+        "m1", [("P", flag_pep, flag_xyz), ("M", myc_pep, myc_xyz), ("H", fab_hc, hc_xyz)]
+    )
+
+    aligned = align_ensemble([s0, s1], ScoringOptions())
+    assert aligned.chain_mapping[1] == {"H": "H", "P": "P", "M": "M"}
+    assert aligned.align_coords[0].shape == (len(fab_hc) + len(flag_pep) + len(myc_pep), 3)

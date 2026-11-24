@@ -186,3 +186,87 @@ def test_load_manifest_csv_and_tsv(tmp_path: Path) -> None:
     bad.write_text("id,file\nmab1,/tmp/x.cif\n", encoding="utf-8")
     with pytest.raises(SsrmsdError, match="ensemble_id"):
         load_manifest(bad)
+
+
+def test_hidden_files_and_appledouble_skipped_without_keyerror(tmp_path: Path) -> None:
+    job_dir = tmp_path / "job"
+    chains = make_complex_chains()
+    write_cif(job_dir / "m0.cif", chains)
+    write_cif(job_dir / "m1.cif", chains)
+    # Hidden checkpoint dir and macOS AppleDouble file must be ignored cleanly
+    write_cif(job_dir / ".ipynb_checkpoints" / "m0-checkpoint.cif", chains)
+    (job_dir / "._m0.cif").write_bytes(b"\x00\x05\x16\x07Mac OS X binary resource fork")
+
+    loaded_dir = load_ensemble_structures([StructureInput(job_dir)], ScoringOptions())
+    assert [s.name for s in loaded_dir] == ["m0.cif", "m1.cif"]
+
+    # Same inside a .tar.gz archive
+    tar_path = make_tar_gz(job_dir, tmp_path / "job.tar.gz")
+    loaded_tar = load_ensemble_structures([StructureInput(tar_path)], ScoringOptions())
+    assert len(loaded_tar) == 2
+    assert all(not Path(s.name).name.startswith("._") for s in loaded_tar)
+
+
+def test_altloc_prefers_a_when_b_listed_first_and_skips_branched(tmp_path: Path) -> None:
+    import gemmi
+
+    # Build a 3-residue polymer chain where altloc B appears BEFORE altloc A on res 1,
+    # plus a Branched NAG glycan residue with a CA atom.
+    st = gemmi.Structure()
+    model = gemmi.Model(1)
+    chain = gemmi.Chain("A")
+
+    res1 = gemmi.Residue()
+    res1.name = "ALA"
+    res1.seqid = gemmi.SeqId("1")
+    res1.entity_type = gemmi.EntityType.Polymer
+    atom_b = gemmi.Atom()
+    atom_b.name = "CA"
+    atom_b.element = gemmi.Element("C")
+    atom_b.pos = gemmi.Position(99.0, 99.0, 99.0)
+    atom_b.altloc = "B"
+    res1.add_atom(atom_b)
+    atom_a = gemmi.Atom()
+    atom_a.name = "CA"
+    atom_a.element = gemmi.Element("C")
+    atom_a.pos = gemmi.Position(1.0, 2.0, 3.0)
+    atom_a.altloc = "A"
+    res1.add_atom(atom_a)
+    chain.add_residue(res1)
+
+    for idx, (rname, xyz) in enumerate(
+        [("GLY", (4.0, 5.0, 6.0)), ("VAL", (7.0, 8.0, 9.0))], start=2
+    ):
+        r = gemmi.Residue()
+        r.name = rname
+        r.seqid = gemmi.SeqId(str(idx))
+        r.entity_type = gemmi.EntityType.Polymer
+        a = gemmi.Atom()
+        a.name = "CA"
+        a.element = gemmi.Element("C")
+        a.pos = gemmi.Position(*xyz)
+        r.add_atom(a)
+        chain.add_residue(r)
+
+    glycan = gemmi.Residue()
+    glycan.name = "NAG"
+    glycan.seqid = gemmi.SeqId("200")
+    glycan.entity_type = gemmi.EntityType.Branched
+    g_atom = gemmi.Atom()
+    g_atom.name = "CA"
+    g_atom.element = gemmi.Element("C")
+    g_atom.pos = gemmi.Position(50.0, 50.0, 50.0)
+    glycan.add_atom(g_atom)
+    chain.add_residue(glycan)
+
+    model.add_chain(chain)
+    st.add_model(model)
+    st.setup_entities()
+
+    cif_bytes = st.make_mmcif_document().as_string().encode("utf-8")
+    loaded = read_structures_from_bytes(cif_bytes, "altloc_glycan.cif")
+    assert len(loaded) == 1
+    c = loaded[0].chains[0]
+    assert c.sequence == "AGV"
+    assert c.ca_coords.shape == (3, 3)
+    np.testing.assert_allclose(c.ca_coords[0], [1.0, 2.0, 3.0], atol=1e-3)

@@ -120,11 +120,24 @@ def _select_reference(
     )
 
 
-def _align_sequences(ref_seq: str, target_seq: str) -> tuple[float, dict[int, int]]:
-    """Globally align two 1-letter sequences via gemmi; return overlap identity and index map."""
+def _make_alignment_scoring() -> gemmi.AlignmentScoring:
+    """Affine-gap scoring that avoids scattering short peptides across long chains."""
+    scoring = gemmi.AlignmentScoring()
+    scoring.match = 2
+    scoring.mismatch = -2
+    scoring.gapo = -6
+    scoring.gape = -1
+    return scoring
+
+
+_ALIGNMENT_SCORING = _make_alignment_scoring()
+
+
+def _align_sequences(ref_seq: str, target_seq: str) -> tuple[float, float, dict[int, int]]:
+    """Globally align two 1-letter sequences via gemmi; return overlap identity, coverage, map."""
     if not ref_seq or not target_seq:
-        return 0.0, {}
-    res = gemmi.align_string_sequences(list(ref_seq), list(target_seq), [])
+        return 0.0, 0.0, {}
+    res = gemmi.align_string_sequences(list(ref_seq), list(target_seq), [], _ALIGNMENT_SCORING)
     g1 = res.add_gaps(ref_seq, 1)
     g2 = res.add_gaps(target_seq, 2)
     i = 0
@@ -145,7 +158,8 @@ def _align_sequences(ref_seq: str, target_seq: str) -> tuple[float, dict[int, in
         elif c2 != "-":
             j += 1
     identity = (matches / aligned_pairs) if aligned_pairs > 0 else 0.0
-    return identity, idx_map
+    coverage = aligned_pairs / max(len(ref_seq), len(target_seq))
+    return identity, coverage, idx_map
 
 
 def _resolve_chain_sets(
@@ -207,16 +221,16 @@ def align_ensemble(
                     f"reference '{ref.name}' has {expected_n}"
                 )
 
-    # Homomer guard on reference required chains.
+    # Homomer guard on reference required chains (gated on both identity and overlap coverage).
     for i in range(len(required_ids)):
         for j in range(i + 1, len(required_ids)):
             c1 = ref_chains_by_id[required_ids[i]]
             c2 = ref_chains_by_id[required_ids[j]]
-            ident, _ = _align_sequences(c1.sequence, c2.sequence)
-            if ident >= options.min_chain_id:
+            ident, cov, _ = _align_sequences(c1.sequence, c2.sequence)
+            if ident >= options.min_chain_id and cov >= options.min_coverage:
                 raise SsrmsdError(
                     f"Ambiguous/homomeric chains detected in reference ('{c1.chain_id}' and "
-                    f"'{c2.chain_id}', identity={ident:.2f}); "
+                    f"'{c2.chain_id}', identity={ident:.2f}, coverage={cov:.2f}); "
                     "homomer symmetry matching is not enabled"
                 )
 
@@ -236,25 +250,33 @@ def align_ensemble(
                 per_chain_maps[cid].append((rc, {k: k for k in range(len(rc.sequence))}))
             continue
 
-        # Compute overlap identity matrix between required ref chains and structure chains.
+        # Compute overlap identity & coverage matrices between ref chains and structure chains.
         ident_mat: list[list[float]] = []
+        cov_mat: list[list[float]] = []
         map_mat: list[list[dict[int, int]]] = []
         for r_cid in required_ids:
             r_seq = ref_chains_by_id[r_cid].sequence
             row_id: list[float] = []
+            row_cov: list[float] = []
             row_map: list[dict[int, int]] = []
             for t_chain in s.chains:
-                ident, idx_map = _align_sequences(r_seq, t_chain.sequence)
+                ident, cov, idx_map = _align_sequences(r_seq, t_chain.sequence)
                 row_id.append(ident)
+                row_cov.append(cov)
                 row_map.append(idx_map)
             ident_mat.append(row_id)
+            cov_mat.append(row_cov)
             map_mat.append(row_map)
 
         # Check row/column uniqueness above threshold (homomer/ambiguity guard).
         mapping = {}
         used_targets: set[int] = set()
         for r_i, r_cid in enumerate(required_ids):
-            hits = [t_j for t_j, val in enumerate(ident_mat[r_i]) if val >= options.min_chain_id]
+            hits = [
+                t_j
+                for t_j, (val, cov) in enumerate(zip(ident_mat[r_i], cov_mat[r_i], strict=True))
+                if val >= options.min_chain_id and cov >= options.min_coverage
+            ]
             if len(hits) > 1:
                 hit_ids = [s.chains[t_j].chain_id for t_j in hits]
                 raise SsrmsdError(
@@ -262,11 +284,19 @@ def align_ensemble(
                     f"match reference chain '{r_cid}' above min-chain-id={options.min_chain_id}"
                 )
             if not hits:
-                best = max(ident_mat[r_i]) if ident_mat[r_i] else 0.0
-                raise SsrmsdError(
-                    f"No matching chain in '{s.name}' for reference chain '{r_cid}' "
-                    f"(best identity={best:.2f} < {options.min_chain_id})"
-                )
+                # If a chain matched on sequence identity alone (sub-coverage truncation), let
+                # the symmetric coverage guard below emit the clear coverage diagnostic.
+                id_only = [
+                    t_j for t_j, val in enumerate(ident_mat[r_i]) if val >= options.min_chain_id
+                ]
+                if len(id_only) == 1:
+                    hits = id_only
+                else:
+                    best = max(ident_mat[r_i]) if ident_mat[r_i] else 0.0
+                    raise SsrmsdError(
+                        f"No matching chain in '{s.name}' for reference chain '{r_cid}' "
+                        f"(best identity={best:.2f} < {options.min_chain_id})"
+                    )
             t_j = hits[0]
             if t_j in used_targets:
                 raise SsrmsdError(

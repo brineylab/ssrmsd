@@ -128,3 +128,30 @@ def test_public_api_imports() -> None:
     assert hasattr(ssrmsd, "EnsembleResult")
     assert hasattr(ssrmsd, "ScoringOptions")
     assert hasattr(ssrmsd, "StructureInput")
+
+
+def test_score_batch_fail_fast_cancels_pending_futures(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from concurrent.futures import ProcessPoolExecutor as RealPool
+
+    shutdown_calls: list[dict[str, object]] = []
+
+    class TrackingPool(RealPool):
+        def shutdown(self, wait: bool = True, *, cancel_futures: bool = False) -> None:
+            shutdown_calls.append({"wait": wait, "cancel_futures": cancel_futures})
+            super().shutdown(wait=wait, cancel_futures=cancel_futures)
+
+    monkeypatch.setattr("ssrmsd.score.ProcessPoolExecutor", TrackingPool)
+
+    bad = tmp_path / "bad.tar.gz"
+    bad.write_bytes(b"corrupt")
+    d = make_af3_job_dir(tmp_path, "good", n_samples=2)
+    specs = [
+        EnsembleSpec("bad", (StructureInput(bad),)),
+        *[EnsembleSpec(f"good_{i}", (StructureInput(d),)) for i in range(6)],
+    ]
+    with pytest.raises(SsrmsdError):
+        score_batch(specs, workers=2, fail_fast=True)
+
+    assert any(call["cancel_futures"] is True for call in shutdown_calls)

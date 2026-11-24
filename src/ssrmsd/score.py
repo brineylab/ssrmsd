@@ -137,9 +137,18 @@ def score_batch(
 
     payloads = [(spec, opts, include_pairwise) for spec in ensembles]
     results = []
-    with ProcessPoolExecutor(max_workers=workers) as executor:
-        for res in executor.map(_score_spec_worker, payloads):
+    executor = ProcessPoolExecutor(max_workers=workers)
+    cancelled = False
+    try:
+        futures = [executor.submit(_score_spec_worker, p) for p in payloads]
+        for fut in futures:
+            res = fut.result()
             if fail_fast and res.status == "error":
+                cancelled = True
+                executor.shutdown(wait=False, cancel_futures=True)
                 raise SsrmsdError(f"{res.ensemble_id}: {res.error}")
             results.append(res)
+    finally:
+        if not cancelled:
+            executor.shutdown(wait=True)
     return results
