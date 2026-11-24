@@ -14,10 +14,10 @@ Self-consistency RMSD (`ssRMSD`) scoring for predicted antibody–antigen struct
 
 ## Installation
 
-Python 3.11+ (CPU-only; only `gemmi` and `numpy` runtime dependencies):
+Python 3.11+ (CPU-only; `gemmi`, `numpy`, and `typer`):
 
 ```bash
-pip install git+https://github.com/brineylab/ssrmsd.git
+pip install ssRMSD
 ```
 
 For local development:
