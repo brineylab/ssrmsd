@@ -1,14 +1,23 @@
 [build-system]
-requires = ["hatchling>=1.25"]
+requires = ["hatchling>=1.25", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [project]
-name = "ssrmsd"
-version = "0.1.0"
+name = "ssRMSD"
+dynamic = ["version"]
 description = "Self-consistency RMSD (ssRMSD) scoring for predicted antibody-antigen structure ensembles."
 readme = "README.md"
-license = { text = "MIT" }
+license = "MIT"
 requires-python = ">=3.11"
+classifiers = [
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
 dependencies = [
     "gemmi>=0.6.5",
     "numpy>=1.26",
@@ -17,11 +26,23 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
-    "ruff>=0.6",
+    "ruff>=0.8",
+    "ty==0.0.40",
 ]
 
 [project.scripts]
 ssrmsd = "ssrmsd.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/brineylab/ssrmsd"
+Repository = "https://github.com/brineylab/ssrmsd"
+Issues = "https://github.com/brineylab/ssrmsd/issues"
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.version.raw-options]
+scm.git.describe_command = ["git", "describe", "--dirty", "--tags", "--long", "--match", "v*"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/ssrmsd"]
