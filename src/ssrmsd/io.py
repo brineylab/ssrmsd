@@ -42,7 +42,7 @@ SUPPORTED_ARCHIVE_SUFFIXES: tuple[str, ...] = (
 )
 
 _AF3_SAMPLE_RE = re.compile(r"(^|/)seed-[^/]+_sample-\d+/")
-_MODEL_GROUP_RE = re.compile(r"^(.+)_model_\d+$")
+_MODEL_GROUP_RE = re.compile(r"^(.+)_(?:model|sample)_\d+$")
 
 
 def _match_suffix(name: str, suffixes: tuple[str, ...]) -> str | None:

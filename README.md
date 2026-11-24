@@ -45,7 +45,7 @@ ssrmsd score af3=af3_mab1.tar.gz esmfold=esm_mab1/ \
 ### Score a batch of ensembles
 
 ```bash
-# Join multiple predictor roots by matching subfolder/archive name (or flat <mab>_model_<k> files)
+# Join multiple predictor roots by matching subfolder/archive name (or flat <mab>_{model,sample}_<k> files)
 ssrmsd batch \
   --dir af3=/data/af3_runs \
   --dir esmfold=/data/esm_runs \
@@ -98,18 +98,12 @@ print(result.rms_rmsd, result.ssRMSD, result.cross_source_mean_rmsd)
 
 ## `brineylab/toolshed` Integration
 
-To package `ssrmsd` as a CPU-only tool in `brineylab/toolshed` (`tools/ssrmsd/`):
-
-**`Containerfile`** (no `ENTRYPOINT`; `ssrmsd` on `PATH`):
-```dockerfile
-FROM python:3.12-slim
-RUN pip install --no-cache-dir "git+https://github.com/brineylab/ssrmsd.git@v0.1.0"
-```
+`ssrmsd` is packaged as a CPU-only tool in `brineylab/toolshed` (`tools/ssrmsd/`):
 
 Run locally with Podman or on Slurm with Pyxis:
 ```bash
 podman run --rm -v "$PWD":/work -w /work \
-  ghcr.io/brineylab/toolshed/ssrmsd:0.1.0 \
+  ghcr.io/brineylab/toolshed/ssrmsd:1.0.0 \
   ssrmsd batch --dir af3=af3_runs --dir esmfold=esm_runs -o scores.csv
 ```
 
