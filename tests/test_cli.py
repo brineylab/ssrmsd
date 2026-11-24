@@ -223,3 +223,15 @@ def test_cli_console_entrypoint() -> None:
     assert proc.returncode == 0
     assert "score" in proc.stdout
     assert "batch" in proc.stdout
+
+
+def test_cli_version_flag() -> None:
+    from ssrmsd import __version__
+
+    res_long = runner.invoke(app, ["--version"])
+    assert res_long.exit_code == 0, res_long.output
+    assert res_long.stdout.strip() == f"ssrmsd {__version__}"
+
+    res_short = runner.invoke(app, ["-V"])
+    assert res_short.exit_code == 0, res_short.output
+    assert res_short.stdout.strip() == f"ssrmsd {__version__}"

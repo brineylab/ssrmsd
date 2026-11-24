@@ -9,6 +9,7 @@ from typing import Annotated
 
 import typer
 
+from ssrmsd import __version__
 from ssrmsd.format import write_pairwise, write_results
 from ssrmsd.io import discover_batch_dirs, load_manifest, parse_labeled_path
 from ssrmsd.score import score_batch, score_ensemble
@@ -36,6 +37,29 @@ app = typer.Typer(
     no_args_is_help=True,
     add_completion=False,
 )
+
+
+def _version_callback(value: bool) -> None:
+    if value:
+        typer.echo(f"ssrmsd {__version__}")
+        raise typer.Exit(code=0)
+
+
+@app.callback()
+def _main_callback(
+    version: Annotated[
+        bool,
+        typer.Option(
+            "--version",
+            "-V",
+            callback=_version_callback,
+            is_eager=True,
+            help="Show version and exit.",
+        ),
+    ] = False,
+) -> None:
+    """Compute normalized and legacy ssRMSD for predicted structure ensembles."""
+    del version
 
 
 def _parse_chain_list(raw: str | None) -> tuple[str, ...] | None:

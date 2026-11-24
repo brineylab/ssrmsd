@@ -159,6 +159,35 @@ def test_discover_batch_dirs_union_and_intersection(tmp_path: Path) -> None:
     assert [s.ensemble_id for s in inter_specs] == ["mab1"]
 
 
+def test_discover_batch_dirs_groups_esmfold2_sample_files_and_ignores_sidecars(
+    tmp_path: Path,
+) -> None:
+    af3_root = tmp_path / "af3_runs"
+    esm_root = tmp_path / "esmfold2_runs"
+
+    make_af3_job_dir(af3_root, "mab_v2", n_samples=2)
+    write_cif(esm_root / "mab_v2_sample_0.cif", make_complex_chains(noise_seed=1))
+    write_cif(
+        esm_root / "mab_v2_sample_1.cif.gz",
+        make_complex_chains(noise_seed=2),
+        gzipped=True,
+    )
+    write_pdb(
+        esm_root / "mab_v2_sample_10.pdb.gz",
+        make_complex_chains(noise_seed=3),
+        gzipped=True,
+    )
+    (esm_root / "mab_v2_sample_0.json").write_text('{"plddt": 0.9}', encoding="utf-8")
+    (esm_root / "mab_v2_sample_0.npz").write_bytes(b"fake-npz")
+
+    roots = [StructureInput(af3_root, "af3"), StructureInput(esm_root, "esmfold2")]
+    inter_specs = discover_batch_dirs(roots, join="intersection")
+    assert [s.ensemble_id for s in inter_specs] == ["mab_v2"]
+    inputs = inter_specs[0].inputs
+    assert len(inputs) == 4  # 1 af3 dir + 3 esmfold2 structure files (sidecars ignored)
+    assert {inp.source for inp in inputs} == {"af3", "esmfold2"}
+
+
 def test_load_manifest_csv_and_tsv(tmp_path: Path) -> None:
     csv_path = tmp_path / "manifest.csv"
     csv_path.write_text(
